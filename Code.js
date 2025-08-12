@@ -506,3 +506,65 @@ function showConsolidationStatus() {
   ].join('\n');
   SpreadsheetApp.getUi().alert(msg);
 }
+
+/**
+ * Copies the data validation rule from AUGUST!D3:D997 in the main spreadsheet
+ * and applies it to D3:D (down to last row) in every month sheet of every campus spreadsheet listed in CampusBMCInfo!E.
+ *
+ * @returns {void}
+ */
+function copyValidationToAllMonthsAllCampuses() {
+  var MAIN_SPREADSHEET_ID = '1iIkKYUMsc7Lo8CZXBryOBRccIFtMcOdJP4aANeKejgs';
+  var MONTHS = getMonthNames_();
+
+  // Get validation rule from main spreadsheet AUGUST!D3:D997
+  var mainSs = SpreadsheetApp.openById(MAIN_SPREADSHEET_ID);
+  var augustSheet = mainSs.getSheetByName('AUGUST');
+  if (!augustSheet) {
+    SpreadsheetApp.getUi().alert('AUGUST sheet not found in main spreadsheet.');
+    return;
+  }
+  var validationRules = augustSheet.getRange(3, 4, 995, 1).getDataValidations(); // D3:D997
+
+  // Get campus spreadsheet IDs from CampusBMCInfo!E
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var infoSheet = ss.getSheetByName('CampusBMCInfo');
+  if (!infoSheet) {
+    SpreadsheetApp.getUi().alert('CampusBMCInfo sheet not found.');
+    return;
+  }
+  var lastRow = infoSheet.getLastRow();
+  var ids = infoSheet.getRange(2, 5, lastRow - 1, 1).getValues()
+    .map(function(row) { return row[0]; })
+    .filter(function(id) { return id && id.toString().trim() !== ''; });
+
+  var errors = [];
+  var updated = 0;
+  ids.forEach(function(id) {
+    try {
+      var campusSs = SpreadsheetApp.openById(id);
+      MONTHS.forEach(function(month) {
+        var sheet = campusSs.getSheetByName(month);
+        if (!sheet) return;
+        var lr = sheet.getLastRow();
+        if (lr < 3) return; // No data rows
+        var nRows = lr - 2;
+        var range = sheet.getRange(3, 4, nRows, 1); // D3:D(lastRow)
+        // Truncate or repeat validation rules as needed
+        var rulesToApply = [];
+        for (var i = 0; i < nRows; i++) {
+          rulesToApply.push(validationRules[i % validationRules.length][0]);
+        }
+        range.setDataValidations(rulesToApply.map(function(rule){ return [rule]; }));
+        updated++;
+      });
+    } catch (e) {
+      errors.push('Could not update spreadsheet ID ' + id + ': ' + e);
+    }
+  });
+
+  var msg = 'Validation copied to ' + updated + ' sheet(s).';
+  if (errors.length) msg += '\nErrors:\n' + errors.join('\n');
+  SpreadsheetApp.getUi().alert(msg);
+}
+
