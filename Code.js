@@ -120,62 +120,6 @@ function createCampusSpreadsheets() {
  *
  * @returns {void}
  */
-function testCreateCampusSpreadsheets() {
-  // Mock data: [email, campus, level, folderId, spreadsheetId]
-  var mockData = [
-    ['user1@example.com', 'North Campus', 'HS', 'FOLDERID1', ''],
-    ['user2@example.com', 'South Campus', 'MS', 'FOLDERID2', 'EXISTINGID'],
-    ['', 'East Campus', 'ES', 'FOLDERID3', ''],
-    ['user4@example.com', '', 'HS', 'FOLDERID4', ''],
-    ['user5@example.com', 'West Campus', 'HS', '', ''],
-    ['user6@example.com', 'Central Campus', 'HS', 'BADFOLDERID', ''],
-  ];
-  var createdNames = [];
-  var errorMessages = [];
-  for (var i = 0; i < mockData.length; i++) {
-    var row = mockData[i];
-    var email = row[0];
-    var campus = row[1];
-    var folderId = row[3];
-    var spreadsheetId = row[4];
-    if (!campus) {
-      errorMessages.push('Row ' + (i+2) + ': Missing campus name.');
-      continue;
-    }
-    if (!folderId) {
-      errorMessages.push('Row ' + (i+2) + ' (' + campus + '): Missing Main/Level Folder ID.');
-      continue;
-    }
-    if (!email) {
-      errorMessages.push('Row ' + (i+2) + ' (' + campus + '): Missing email.');
-      continue;
-    }
-    var fileExists = false;
-    if (spreadsheetId) {
-      // Simulate file existence: only 'EXISTINGID' exists
-      if (spreadsheetId === 'EXISTINGID') fileExists = true;
-    }
-    if (fileExists) continue; // skip if file exists
-    // Validate folder: only FOLDERID1 and FOLDERID2 are valid
-    if (folderId !== 'FOLDERID1' && folderId !== 'FOLDERID2') {
-      errorMessages.push('Row ' + (i+2) + ' (' + campus + '): Invalid folder ID.');
-      continue;
-    }
-    // Simulate making a copy and removing sheets
-    var campusName = campus + ' BMC Class Count';
-    // Simulate removal of CampusBMCSheetInfo and Totals
-    var sheets = ['Sheet1', 'CampusBMCSheetInfo', 'Totals', 'OtherSheet'];
-    sheets = sheets.filter(function(name) {
-      return name !== 'CampusBMCSheetInfo' && name !== 'Totals';
-    });
-    if (sheets.indexOf('Totals') !== -1) {
-      errorMessages.push('Row ' + (i+2) + ' (' + campus + '): Totals sheet was not removed.');
-    }
-    createdNames.push(campusName);
-  }
-  Logger.log('Created: ' + createdNames.join(', '));
-  Logger.log('Errors: ' + errorMessages.join(', '));
-}
 
 /**
  * Adds custom menu items to the spreadsheet UI for consolidation and setup actions.
@@ -310,8 +254,13 @@ function consolidateLevelNextBatch_(level) {
   // Data begins on row 3 in campus sheets
   if (lr <= 2) return; // headers/metadata only
   var values = sh.getRange(3, 1, lr - 2, lc).getValues();
-        // Filter empty rows
-        var nonBlank = values.filter(function(r) { return !isRowEmpty_(r); });
+        // Only keep rows where at least one of columns A, B, C, or E:O is not empty (exclude D)
+        var nonBlank = values.filter(function(r) {
+          // r[0]=A, r[1]=B, r[2]=C, r[3]=D, r[4]=E, ..., r[14]=O
+          for (var i = 0; i <= 2; i++) { if (r[i] && String(r[i]).trim() !== '') return true; }
+          for (var i = 4; i <= 14; i++) { if (r[i] && String(r[i]).trim() !== '') return true; }
+          return false;
+        });
         if (nonBlank.length === 0) return;
         foundAny = true;
         // Prepare month bucket
@@ -452,7 +401,7 @@ function getMonthNames_() {
     'JANUARY',
     'FEBRUARY',
     'MARCH',
-    'APRIL/MAY PROJECTIONS'
+    'APRIL/ MAY PROJECTIONS'
   ];
 }
 
@@ -507,64 +456,5 @@ function showConsolidationStatus() {
   SpreadsheetApp.getUi().alert(msg);
 }
 
-/**
- * Copies the data validation rule from AUGUST!D3:D997 in the main spreadsheet
- * and applies it to D3:D (down to last row) in every month sheet of every campus spreadsheet listed in CampusBMCInfo!E.
- *
- * @returns {void}
- */
-function copyValidationToAllMonthsAllCampuses() {
-  var MAIN_SPREADSHEET_ID = '1iIkKYUMsc7Lo8CZXBryOBRccIFtMcOdJP4aANeKejgs';
-  var MONTHS = getMonthNames_();
 
-  // Get validation rule from main spreadsheet AUGUST!D3:D997
-  var mainSs = SpreadsheetApp.openById(MAIN_SPREADSHEET_ID);
-  var augustSheet = mainSs.getSheetByName('AUGUST');
-  if (!augustSheet) {
-    SpreadsheetApp.getUi().alert('AUGUST sheet not found in main spreadsheet.');
-    return;
-  }
-  var validationRules = augustSheet.getRange(3, 4, 995, 1).getDataValidations(); // D3:D997
-
-  // Get campus spreadsheet IDs from CampusBMCInfo!E
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var infoSheet = ss.getSheetByName('CampusBMCInfo');
-  if (!infoSheet) {
-    SpreadsheetApp.getUi().alert('CampusBMCInfo sheet not found.');
-    return;
-  }
-  var lastRow = infoSheet.getLastRow();
-  var ids = infoSheet.getRange(2, 5, lastRow - 1, 1).getValues()
-    .map(function(row) { return row[0]; })
-    .filter(function(id) { return id && id.toString().trim() !== ''; });
-
-  var errors = [];
-  var updated = 0;
-  ids.forEach(function(id) {
-    try {
-      var campusSs = SpreadsheetApp.openById(id);
-      MONTHS.forEach(function(month) {
-        var sheet = campusSs.getSheetByName(month);
-        if (!sheet) return;
-        var lr = sheet.getLastRow();
-        if (lr < 3) return; // No data rows
-        var nRows = lr - 2;
-        var range = sheet.getRange(3, 4, nRows, 1); // D3:D(lastRow)
-        // Truncate or repeat validation rules as needed
-        var rulesToApply = [];
-        for (var i = 0; i < nRows; i++) {
-          rulesToApply.push(validationRules[i % validationRules.length][0]);
-        }
-        range.setDataValidations(rulesToApply.map(function(rule){ return [rule]; }));
-        updated++;
-      });
-    } catch (e) {
-      errors.push('Could not update spreadsheet ID ' + id + ': ' + e);
-    }
-  });
-
-  var msg = 'Validation copied to ' + updated + ' sheet(s).';
-  if (errors.length) msg += '\nErrors:\n' + errors.join('\n');
-  SpreadsheetApp.getUi().alert(msg);
-}
 
