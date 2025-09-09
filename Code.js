@@ -679,19 +679,61 @@ function clearLevelDataOnce_(ss, months, level) {
       }
       
       if (!belongsToThisLevel) {
-        rowsToKeep.push(row);
+        // Clean up the row data before keeping it
+        var cleanedRow = [];
+        for (var k = 0; k < row.length; k++) {
+          var cellValue = row[k];
+          // Clean string values
+          if (cellValue && typeof cellValue === 'string') {
+            cellValue = cellValue.trim();
+            // For column K (index 10), ensure it matches expected validation values
+            if (k === 10 && cellValue) {
+              var lowerValue = cellValue.toLowerCase();
+              if (lowerValue === 'per day' || lowerValue === 'perday') {
+                cellValue = 'per Day';
+              } else if (lowerValue === 'per week' || lowerValue === 'perweek') {
+                cellValue = 'per week';
+              }
+            }
+          }
+          cleanedRow.push(cellValue);
+        }
+        rowsToKeep.push(cleanedRow);
       }
     }
     
     // Clear all data rows first
     if (lr >= dataStartRow) {
-      sh.getRange(dataStartRow, 1, lr - dataStartRow + 1, lc).clearContent();
-    }
-    
-    // Write back the rows we want to keep
-    if (rowsToKeep.length > 0) {
-      var keepRange = sh.getRange(dataStartRow, 1, rowsToKeep.length, lc);
-      keepRange.setValues(rowsToKeep);
+      var clearRange = sh.getRange(dataStartRow, 1, lr - dataStartRow + 1, lc);
+      
+      // Clear data validation rules first to prevent validation errors during clearing
+      try {
+        clearRange.clearDataValidations();
+        Utilities.sleep(200); // Small delay after clearing validations
+      } catch (clearValidationError) {
+        Logger.log('Could not clear validation rules in ' + month + ': ' + clearValidationError.toString());
+      }
+      // Then clear the content
+      clearRange.clearContent();
+      
+      // Write back the rows we want to keep
+      if (rowsToKeep.length > 0) {
+        var keepRange = sh.getRange(dataStartRow, 1, rowsToKeep.length, lc);
+        try {
+          keepRange.setValues(rowsToKeep);
+        } catch (writeError) {
+          Logger.log('Error writing preserved rows back to ' + month + ': ' + writeError.toString());
+          // If we can't write back the preserved rows, we need to restore the original data
+          Logger.log('Attempting to restore original data for ' + month);
+          try {
+            var restoreRange = sh.getRange(dataStartRow, 1, allData.length, lc);
+            restoreRange.setValues(allData);
+          } catch (restoreError) {
+            Logger.log('Failed to restore original data for ' + month + ': ' + restoreError.toString());
+          }
+          throw writeError;
+        }
+      }
     }
   });
   
