@@ -159,12 +159,11 @@ function updateCampusFilesWithSep25Updates() {
       message += 'No files were updated. Check that spreadsheet IDs exist in column E.';
     }
     
-    Logger.log('FUNCTION END: updateCampusFilesWithSep25Updates - Updated ' + updated.length + ' campus files');
-    Logger.log('SUMMARY: ' + message);
-    
+  Logger.log('FUNCTION END: updateCampusFilesWithSep25Updates - Updated ' + updated.length + ' campus files');
+  Logger.log('SUMMARY: ' + message);
+  
   } finally {
     // Always release the lock
     lock.releaseLock();
   }
 }
-
