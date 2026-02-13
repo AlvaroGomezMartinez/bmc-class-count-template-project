@@ -1,4 +1,28 @@
 /**
+ * Removes all data validation from column G (7th column) in all month sheets.
+ * Run this once if you want to allow any value (including blanks) in column G.
+ */
+function removeValidationFromColumnsFandGAllMonths() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var months = getMonthNames_();
+  months.forEach(function(month) {
+    var sheet = ss.getSheetByName(month);
+    if (!sheet) {
+      Logger.log('Sheet not found: ' + month);
+      return;
+    }
+    var lastRow = sheet.getMaxRows();
+    // Remove validations from column G (7) and column F (6)
+    var rangeG = sheet.getRange(1, 7, lastRow, 1); // column G, all rows
+    var rangeF = sheet.getRange(1, 6, lastRow, 1); // column F, all rows
+    Logger.log('Clearing validations in ' + month + ' G1:G' + lastRow);
+    rangeG.clearDataValidations();
+    Logger.log('Clearing validations in ' + month + ' F1:F' + lastRow);
+    rangeF.clearDataValidations();
+  });
+  Logger.log('removeValidationFromColumnGAllMonths completed.');
+}
+/**
  * Creates a separate spreadsheet for each campus listed in CampusBMCSheetInfo.
  * - Removes CampusBMCSheetInfo and Totals from each copy
  * - Moves the copy to the folder in column D
@@ -528,7 +552,11 @@ function consolidateLevelNextBatch_(level) {
           // Clean and trim all string values to prevent validation errors
           for (var col = 0; col < aligned.length; col++) {
             if (aligned[col] && typeof aligned[col] === "string") {
-              aligned[col] = aligned[col].trim();
+              // Normalize common problematic characters: non-breaking spaces and smart quotes
+              aligned[col] = aligned[col]
+                .replace(/\u00A0/g, " ")
+                .replace(/[\u2018\u2019]/g, "'")
+                .trim();
             }
           }
 
@@ -693,16 +721,29 @@ function consolidateLevelNextBatch_(level) {
               }
             }
 
-            // Clear validation rules if we have them
-            if (dataValidations.length > 0) {
-              try {
-                range.clearDataValidations();
-                Utilities.sleep(500); // Small delay after clearing validations
-              } catch (clearError) {
-                Logger.log(
-                  "Could not clear validation rules: " + clearError.toString()
-                );
-              }
+            // Always attempt to clear validation rules before writing.
+            // If we were able to read the prior validations we will restore them later.
+            try {
+              Logger.log(
+                "Clearing data validations for target range: " +
+                  startRow +
+                  ",1 -> rows:" +
+                  rowsToAppend.length +
+                  ",cols:" +
+                  lcDest
+              );
+              // Log a sample of the rows we'll write (first 5)
+              Logger.log(
+                "Sample rows to append: " +
+                  JSON.stringify(rowsToAppend.slice(0, Math.min(5, rowsToAppend.length)))
+              );
+              range.clearDataValidations();
+              Utilities.sleep(500); // Small delay after clearing validations
+            } catch (clearError) {
+              Logger.log(
+                "Could not clear validation rules before writing: " +
+                  clearError.toString()
+              );
             }
 
             // Write the data
