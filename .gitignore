@@ -43,6 +43,9 @@ yarn-error.log*
 # Kiro workspace settings
 .kiro/
 
+# Test scripts (not intended for public use)
+tests/
+
 # Script Properties backup files (if any)
 script-properties*.json
 
