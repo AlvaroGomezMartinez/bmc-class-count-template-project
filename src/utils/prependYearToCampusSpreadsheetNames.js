@@ -1,7 +1,14 @@
 /**
- * Prepends '25-26 ' to the name of each campus spreadsheet listed in CampusBMCSheetInfo (column E).
- * Skips if the spreadsheet name already starts with '25-26 '.
- * Alerts the user with a summary of changes and errors.
+ * Prepends a year-range prefix to the name of each campus spreadsheet listed
+ * in the CampusBMCSheetInfo control sheet (column E).
+ *
+ * Skips any file whose name already starts with the prefix. Alerts the user
+ * with a summary of renamed files, already-correct files, and any errors.
+ *
+ * Update the prefix string (currently '25-26 ') to match the school year
+ * before running.
+ *
+ * @returns {void}
  */
 function prependYearToCampusSpreadsheetNames() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();

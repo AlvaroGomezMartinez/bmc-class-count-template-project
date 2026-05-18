@@ -1,3 +1,13 @@
+/**
+ * Updates the cumulative-minutes header cell in each monthly sheet of every
+ * campus spreadsheet listed in CampusBMCSheetInfo column E.
+ *
+ * Each month maps to a specific cell (N2 for regular months, N3 for the
+ * projections tab) and a date-range label string. Update the values in
+ * monthUpdates to match the current school year's date ranges before running.
+ *
+ * @returns {void}
+ */
 function updateColNInMonthSheets() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const infoSheet = ss.getSheetByName('CampusBMCSheetInfo');

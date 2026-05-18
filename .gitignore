@@ -36,10 +36,18 @@ yarn-error.log*
 .env.*
 
 # Git / clasp
+# .clasp.json contains the scriptId — keep private to prevent unauthorized pushes
 .clasp.json
 .claspignore.local
-# If you keep local-only ignore patterns, uncomment the next line
-# .claspignore.local
+
+# Kiro workspace settings
+.kiro/
+
+# Script Properties backup files (if any)
+script-properties*.json
+
+# Internal district handoff document (contains internal URLs and contact details)
+README_Template.md
 
 # Misc
 Thumbs.db

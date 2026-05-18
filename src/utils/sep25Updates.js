@@ -1,18 +1,23 @@
-/** This file contains updates that were requested from the user.
- * - Update the header on D2 to read, "2025/2026 Campus"
- * - Update the data verification lists in cols F & G to have the correct disability labels
- * - Update the header on P2 to have, "Home Campus"
- * - Add borders down column P
+/** This file contains a one-time utility for updating campus spreadsheet headers,
+ * data validation lists, and column formatting.
+ *
+ * Originally written to apply a specific set of schema updates to all campus files.
+ * Generalized for reuse: update the header values, validation options, and column
+ * references below to match your own spreadsheet schema before running.
  */
 
 /**
- * Updates each campus file with September 25, 2025 requirements.
- * 
- * Goes into each campus file listed in CampusBMCSheetInfo column E and updates:
- * - Monthly tabs (AUGUST-MARCH): D2="2025/2026 Campus", P2="Home Campus", borders in column P, 
- *   data validation F3:G with "AU, OHI, ED, SI, ID, LD, OTHER"
- * - APRIL/ MAY PROJECTIONS tab: data validation G4:H with "AU, OHI, ED, SI, ID, LD, OTHER"
- * 
+ * Updates each campus spreadsheet listed in CampusBMCSheetInfo with schema changes.
+ *
+ * For monthly tabs (AUGUST–MARCH):
+ *   - Sets a header label in column D row 2
+ *   - Sets a header label in column P row 2
+ *   - Applies borders to column P
+ *   - Applies a dropdown data validation list to columns F–G starting at row 3
+ *
+ * For the APRIL/MAY PROJECTIONS tab:
+ *   - Applies the same dropdown validation to columns G–H starting at row 4
+ *
  * @returns {void}
  */
 function updateCampusFilesWithSep25Updates() {

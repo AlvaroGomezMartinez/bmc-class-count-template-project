@@ -1,8 +1,21 @@
-// Utility function: Copies campus names and sets data validation in campus spreadsheets
-// See main script for usage and documentation
-
+/**
+ * Fills the campus name column and applies data validation to the service type column
+ * in every monthly sheet of each campus spreadsheet listed in CampusBMCSheetInfo.
+ *
+ * Processes campuses in batches (default 10) using a resumable cursor stored in
+ * Script Properties (key: CAMPUS_FILL_IDX). Run repeatedly until all campuses
+ * are processed; the cursor resets automatically when complete.
+ *
+ * Requires the MASTER_SPREADSHEET_ID Script Property to be set.
+ *
+ * @returns {void}
+ */
 function copyValidationToAllMonthsAllCampuses() {
-  var masterId = '1iIkKYUMsc7Lo8CZXBryOBRccIFtMcOdJP4aANeKejgs';
+  var masterId = PropertiesService.getScriptProperties().getProperty('MASTER_SPREADSHEET_ID');
+  if (!masterId) {
+    SpreadsheetApp.getUi().alert('Script Property "MASTER_SPREADSHEET_ID" is not set. Please add it via Project Settings > Script Properties.');
+    return;
+  }
   var master = SpreadsheetApp.openById(masterId);
   var campusInfoSheet = master.getSheetByName('CampusBMCSheetInfo');
   var data = campusInfoSheet.getRange(2, 2, campusInfoSheet.getLastRow() - 1, 4).getValues(); // B2:E

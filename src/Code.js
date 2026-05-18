@@ -1,6 +1,8 @@
 /**
- * Removes all data validation from column G (7th column) in all month sheets.
- * Run this once if you want to allow any value (including blanks) in column G.
+ * Removes all data validation from columns F and G in all monthly data sheets.
+ * Run this once to allow any value (including blanks) in those columns.
+ *
+ * @returns {void}
  */
 function removeValidationFromColumnsFandGAllMonths() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -23,11 +25,11 @@ function removeValidationFromColumnsFandGAllMonths() {
   Logger.log('removeValidationFromColumnGAllMonths completed.');
 }
 /**
- * Creates a separate spreadsheet for each campus listed in CampusBMCSheetInfo.
- * - Removes CampusBMCSheetInfo and Totals from each copy
- * - Moves the copy to the folder in column D
- * - Shares with the email in column A
- * - Writes the new spreadsheet ID in column E
+ * Creates a separate spreadsheet for each campus listed in the CampusBMCSheetInfo control sheet.
+ * Reads campus info (email, name, folder ID) from that sheet, copies the bound template,
+ * removes admin-only tabs from each copy, moves it to the specified Drive folder,
+ * shares it with the campus editor, and writes the new spreadsheet ID back to column E.
+ * Skips rows where a spreadsheet ID already exists and the file is accessible.
  *
  * @returns {void}
  */
@@ -169,14 +171,10 @@ function createCampusSpreadsheets() {
 }
 
 /**
- * Test function for createCampusSpreadsheets logic using mock data.
- * Logs results to help verify correct behavior.
+ * Adds the custom BMC menu to the spreadsheet UI when the file is opened.
+ * Menu items cover campus data consolidation (by level and batch), automated
+ * overnight processing, status display, and campus spreadsheet creation.
  *
- * @returns {void}
- */
-
-/**
- * Adds custom menu items to the spreadsheet UI for consolidation and setup actions.
  * @returns {void}
  */
 function onOpen() {
@@ -208,22 +206,29 @@ function onOpen() {
 }
 
 // ================= Consolidation by Level (ES/MS/HS) =================
-// Public wrappers for menu
+// Public menu wrappers — each delegates to the shared private implementation.
+
+/** Resets the ES cursor and processes the first batch. @returns {void} */
 function consolidateLevelStartES() {
   consolidateLevelStart_("ES");
 }
+/** Resets the MS cursor and processes the first batch. @returns {void} */
 function consolidateLevelStartMS() {
   consolidateLevelStart_("MS");
 }
+/** Resets the HS cursor and processes the first batch. @returns {void} */
 function consolidateLevelStartHS() {
   consolidateLevelStart_("HS");
 }
+/** Processes the next pending batch for ES. @returns {void} */
 function consolidateLevelNextBatchES() {
   consolidateLevelNextBatch_("ES");
 }
+/** Processes the next pending batch for MS. @returns {void} */
 function consolidateLevelNextBatchMS() {
   consolidateLevelNextBatch_("MS");
 }
+/** Processes the next pending batch for HS. @returns {void} */
 function consolidateLevelNextBatchHS() {
   consolidateLevelNextBatch_("HS");
 }
@@ -315,7 +320,6 @@ function consolidateLevelNextBatch_(level) {
     }
 
     var errors = [];
-    var processedCampuses = [];
     batch.forEach(function (item) {
       var campusName = item.campus;
       var campusSs;
@@ -325,6 +329,7 @@ function consolidateLevelNextBatch_(level) {
         errors.push(
           "Skip " + campusName + ": cannot open spreadsheet " + item.id
         );
+        Logger.log("Skip " + campusName + ": cannot open spreadsheet " + item.id);
         return;
       }
       var foundAny = false;
@@ -363,7 +368,7 @@ function consolidateLevelNextBatch_(level) {
           bucket.rowsByCampus[campusName] || []
         ).concat(nonBlank);
       });
-      if (foundAny) processedCampuses.push(campusName);
+      if (foundAny) Logger.log('Collected data from campus: ' + campusName);
     });
 
     // Clear existing data for this level once per run (only when starting from index 0)
@@ -389,7 +394,8 @@ function consolidateLevelNextBatch_(level) {
       return v.toUpperCase();
     });
 
-    // Valid campus names from the error message + additional staff names found in data
+    // Allowed campus name values for column D validation.
+    // Update this list to match the campus names used in your CampusBMCSheetInfo control sheet.
     var validCampuses = [
       "Adams Hill",
       "Aue",
@@ -513,7 +519,6 @@ function consolidateLevelNextBatch_(level) {
         validCampusesUpper.slice(0, 10).join(", ")
     );
 
-    var ssIdMaster = ss.getId(); // to avoid accidental writes elsewhere
     var monthCount = 0;
     months.forEach(function (month) {
       // Add delay between months to prevent rate limiting (except for first month)
@@ -859,8 +864,10 @@ function consolidateLevelNextBatch_(level) {
 
     // Only show UI alert for manual processes
     if (!isAutoMode) {
+      var skippedMsg = errors.length > 0 ? "\nSkipped campuses:\n" + errors.join("\n") + "\n" : "";
       SpreadsheetApp.getUi().alert(
         errorMsg +
+          skippedMsg +
           "Level " +
           level +
           " batch complete.\nProcessed campuses: " +
@@ -1251,28 +1258,35 @@ function showConsolidationStatus() {
 // ================= Automated Batch Processing =================
 
 /**
- * Start automated processing for ES level
+ * Starts automated (trigger-based) batch processing for the ES level.
+ * @returns {void}
  */
 function autoConsolidateLevelES() {
   autoConsolidateLevel_("ES");
 }
 
 /**
- * Start automated processing for MS level
+ * Starts automated (trigger-based) batch processing for the MS level.
+ * @returns {void}
  */
 function autoConsolidateLevelMS() {
   autoConsolidateLevel_("MS");
 }
 
 /**
- * Start automated processing for HS level
+ * Starts automated (trigger-based) batch processing for the HS level.
+ * @returns {void}
  */
 function autoConsolidateLevelHS() {
   autoConsolidateLevel_("HS");
 }
 
 /**
- * Start automated processing for all levels in sequence (ES -> MS -> HS)
+ * Starts automated processing for all levels in sequence (ES → MS → HS).
+ * Sets up sequence tracking in Script Properties, cleans up any existing triggers,
+ * and kicks off the ES level. Each level automatically starts the next when complete.
+ *
+ * @returns {void}
  */
 function autoConsolidateAllLevels() {
   var props = PropertiesService.getScriptProperties();
@@ -1293,7 +1307,10 @@ function autoConsolidateAllLevels() {
 }
 
 /**
- * Stop all automated processing and clean up triggers
+ * Stops all automated processing and removes all time-based triggers.
+ * Clears AUTO_MODE flags for all levels and the AUTO_ALL_LEVELS sequence flag.
+ *
+ * @returns {void}
  */
 function stopAutoProcessing() {
   var props = PropertiesService.getScriptProperties();
@@ -1317,8 +1334,12 @@ function stopAutoProcessing() {
 }
 
 /**
- * Internal function to start automated processing for a specific level
- * @param {string} level - The school level (ES|MS|HS)
+ * Starts automated batch processing for a specific level.
+ * Sets the AUTO_MODE flag, cleans up stale triggers, and kicks off the first batch.
+ * Shows a UI alert only when not running as part of an "Auto All Levels" sequence.
+ *
+ * @param {string} level - The school level to process (ES|MS|HS).
+ * @returns {void}
  */
 function autoConsolidateLevel_(level) {
   var props = PropertiesService.getScriptProperties();
@@ -1352,9 +1373,13 @@ function autoConsolidateLevel_(level) {
 }
 
 /**
- * Schedule the next batch for a level using time-based triggers
- * @param {string} level - The school level (ES|MS|HS)
- * @param {boolean} isRetry - Whether this is a retry after an error
+ * Schedules the next batch for a level using a time-based trigger.
+ * Uses a 2-minute delay normally, or 5 minutes when retrying after a service error.
+ * Falls back to a synchronous sleep + immediate call if trigger creation fails.
+ *
+ * @param {string} level - The school level (ES|MS|HS).
+ * @param {boolean} isRetry - True if scheduling a retry after a transient error.
+ * @returns {void}
  */
 function scheduleNextBatch_(level, isRetry) {
   try {
@@ -1394,8 +1419,12 @@ function scheduleNextBatch_(level, isRetry) {
 }
 
 /**
- * Clean up triggers for a specific level
- * @param {string} level - The school level (ES|MS|HS)
+ * Removes all time-based triggers associated with a given level.
+ * Deletes by stored trigger ID first, then sweeps for any orphaned triggers
+ * whose handler function matches the level's auto-continue function name.
+ *
+ * @param {string} level - The school level (ES|MS|HS).
+ * @returns {void}
  */
 function cleanupTriggers_(level) {
   var props = PropertiesService.getScriptProperties();
@@ -1440,7 +1469,11 @@ function cleanupTriggers_(level) {
 }
 
 /**
- * Continue to the next level in "Auto All Levels" sequence
+ * Advances the "Auto All Levels" sequence to the next level.
+ * Reads the remaining levels from Script Properties, starts the next one,
+ * and sends a completion email when all levels are done.
+ *
+ * @returns {void}
  */
 function startNextLevelInSequence_() {
   var props = PropertiesService.getScriptProperties();
@@ -1475,30 +1508,28 @@ function startNextLevelInSequence_() {
 
 // ================= Auto-Continue Functions (called by triggers) =================
 
-/**
- * Auto-continue function for ES (called by time-based triggers)
- */
+/** Time-based trigger entry point for ES auto-continue. @returns {void} */
 function autoContinueBatch_ES() {
   autoContinueBatch_("ES");
 }
 
-/**
- * Auto-continue function for MS (called by time-based triggers)
- */
+/** Time-based trigger entry point for MS auto-continue. @returns {void} */
 function autoContinueBatch_MS() {
   autoContinueBatch_("MS");
 }
 
-/**
- * Auto-continue function for HS (called by time-based triggers)
- */
+/** Time-based trigger entry point for HS auto-continue. @returns {void} */
 function autoContinueBatch_HS() {
   autoContinueBatch_("HS");
 }
 
 /**
- * Internal function to continue batch processing
- * @param {string} level - The school level (ES|MS|HS)
+ * Verifies that auto mode is still active for the level, cleans up the calling
+ * trigger, then processes the next batch. Sends an error email and stops
+ * automation if an unrecoverable error occurs.
+ *
+ * @param {string} level - The school level (ES|MS|HS).
+ * @returns {void}
  */
 function autoContinueBatch_(level) {
   var props = PropertiesService.getScriptProperties();
@@ -1531,9 +1562,13 @@ function autoContinueBatch_(level) {
 // ================= Email Notification Functions =================
 
 /**
- * Send completion email notification
- * @param {string} level - The school level or 'ALL'
- * @param {string} type - 'single' or 'sequence'
+ * Sends a completion email to the active user when consolidation finishes.
+ * Includes a link to the master spreadsheet. Silently logs and continues if
+ * the email cannot be sent (e.g., no active user session).
+ *
+ * @param {string} level - The school level that completed, or 'ALL' for a full sequence.
+ * @param {string} type - 'single' for one level, 'sequence' for all levels.
+ * @returns {void}
  */
 function sendCompletionEmail_(level, type) {
   try {
@@ -1586,9 +1621,13 @@ function sendCompletionEmail_(level, type) {
 }
 
 /**
- * Send error email notification
- * @param {string} level - The school level
- * @param {string} errorMessage - The error message
+ * Sends an error notification email to the active user when automated processing fails.
+ * Includes the error message and instructions for resuming manually.
+ * Silently logs and continues if the email cannot be sent.
+ *
+ * @param {string} level - The school level where the error occurred (ES|MS|HS).
+ * @param {string} errorMessage - The error message to include in the email body.
+ * @returns {void}
  */
 function sendErrorEmail_(level, errorMessage) {
   try {
